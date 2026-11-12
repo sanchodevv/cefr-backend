@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum Level {
+  B1
+  B2
+  C1
+}
+
+enum Module {
+  READING
+  LISTENING
+  WRITING
+  SPEAKING
+}
+
+enum TaskType {
+  TASK_1
+  TASK_2
+}
+
+model User {
+  id          String       @id @default(uuid())
+  googleId    String       @unique @map("google_id")
+  email       String       @unique
+  name        String
+  picture     String?
+  role        Role         @default(STUDENT)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  submissions Submission[]
+
+  @@map("users")
+}
+
+model ReadingTest {
+  id          String       @id @default(uuid())
+  title       String
+  difficulty  Level
+  passages    Json // [{ title?, text }]
+  questions   Json // [{ id, part?, type, prompt, options[], correct, tag }]
+  durationMin Int          @default(60) @map("duration_min")
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  submissions Submission[]
+
+  @@index([difficulty, published])
+  @@map("reading_tests")
+}
+
+model ListeningTest {
+  id          String       @id @default(uuid())
+  title       String
+  difficulty  Level
+  audioUrl    String       @map("audio_url")
+  transcript  String?
+  questions   Json
+  durationMin Int          @default(45) @map("duration_min")
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  submissions Submission[]
+
+  @@index([difficulty, published])
+  @@map("listening_tests")
+}
+
+model WritingTask {
+  id          String       @id @default(uuid())
+  title       String
+  promptText  String       @map("prompt_text")
+  taskType    TaskType     @map("task_type")
+  difficulty  Level?
+  minWords    Int          @default(120) @map("min_words")
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  submissions Submission[]
+
+  @@index([taskType, published])
+  @@map("writing_tasks")
+}
+
+model SpeakingTask {
+  id          String       @id @default(uuid())
+  title       String
+  promptParts Json         @map("prompt_parts") // [{ part: 1|2|3, label?, prompt }]
+  published   Boolean      @default(true)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  submissions Submission[]
+
+  @@map("speaking_tasks")
+}
+
+// Exactly one of the four *_id columns is set per row (enforced in the service layer).
+model Submission {
+  id              String        @id @default(uuid())
+  userId          String        @map("user_id")
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module          Module        @map("module_type")
+  readingTestId   String?       @map("reading_test_id")
+  readingTest     ReadingTest?  @relation(fields: [readingTestId], references: [id], onDelete: SetNull)
+  listeningTestId String?       @map("listening_test_id")
+  listeningTest   ListeningTest? @relation(fields: [listeningTestId], references: [id], onDelete: SetNull)
+  writingTaskId   String?       @map("writing_task_id")
+  writingTask     WritingTask?  @relation(fields: [writingTaskId], references: [id], onDelete: SetNull)
+  speakingTaskId  String?       @map("speaking_task_id")
+  speakingTask    SpeakingTask? @relation(fields: [speakingTaskId], references: [id], onDelete: SetNull)
+  testTitle       String        @map("test_title")
+  userAnswers     Json          @map("user_answers")
+  score           Int?
+  maxScore        Int           @default(75) @map("max_score")
+  level           String?
+  aiFeedback      Json?         @map("ai_feedback")
+  submittedAt     DateTime      @default(now()) @map("submitted_at")
+
+  @@index([userId, submittedAt])
+  @@map("submissions")
+}
